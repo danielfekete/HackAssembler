@@ -3,8 +3,8 @@ import re
 class InstructionParser:
     def __init__(self,src:str):
         # open the input file
-        self._inputFile=open(src, 'r')
-        self._currentInstruction=""
+        self._inputFile = open(src, 'r')
+        self._currentInstruction = ""
 
     # read next line
     # this method should be called only if hasMoreLines() is true
@@ -12,7 +12,7 @@ class InstructionParser:
         while True:
             line=self._inputFile.readline()
             # When instruction is valid (not empty line or a comment set the current instruction and return)
-            if bool(re.search(r"^([^\S]+)|(\/\/.+)$",line)) == False:
+            if re.match(r"^[\s]*$|^[\s]*\/\/.*$",line) == None:
                 # Set the new instruction
                 self._currentInstruction=line.strip()
                 return
@@ -39,9 +39,12 @@ class InstructionParser:
     # @2 -> A instruction
     # D=A -> C instruction
     def instructionType(self) -> str:
+        labelMatch =re.match(r"^\(.+\)$",self._currentInstruction)
         if self._currentInstruction[0] == "@":
-            return "A_COMMAND"
-        return "C_COMMAND"
+            return "A_INSTRUCTION"
+        elif labelMatch:
+            return "L_INSTRUCTION"
+        return "C_INSTRUCTION"
     
     # Returns the instruction dest field
     def dest(self) -> str | None:

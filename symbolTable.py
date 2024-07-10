@@ -14,7 +14,7 @@ class SymbolTable:
 
     # Check if symbol exists in the table
     def contains(self,symbol:str):
-        return bool(self._symbols[symbol])
+        return symbol in self._symbols
     
     # Returns the address associated with the symbol
     def get_address(self,symbol:str):

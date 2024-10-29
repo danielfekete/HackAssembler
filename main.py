@@ -1,75 +1,74 @@
 import sys
 import os
 import re
-import instructionParser
-import codeGenerator
-import symbolTable
+from instructionParser import (InstructionParser)
+from codeGenerator import (CodeGenerator)
+from symbolTable import (SymbolTable)
+
 
 def main():
-    # opens the input file
+    """The Hack assembler reads as input a text file named xxx.asm, containing a Hack assembly program, and produces as output a text file named xxx.hack, containing the translated Hack machine code."""
     src = sys.argv[1]
-    # create the output file
+    # The generated file name will be xxx.hack from xxx.asm
     outName = src.replace(".asm",".hack")
     if os.path.exists(outName):
         os.remove(outName)
     out = open(outName,"a")
-    parser = instructionParser.InstructionParser(src)
-    generator = codeGenerator.CodeGenerator()
-    symbol=symbolTable.SymbolTable()
-    lineCount = -1
+    instructionParser = InstructionParser(src)
+    codeGenerator = CodeGenerator()
+    symbolTable = SymbolTable()
+    lineCount = 0
 
     # First pass
     # Collect the labels and fill the symbol table
-    while parser.hasMoreLines():
-        parser.advance()
-        if parser.instructionType() == "L_INSTRUCTION":
+    while instructionParser.hasMoreCommands():
+        instructionParser.advance()
+        if instructionParser.instructionType() == "L_INSTRUCTION":
             # Collect the label
-            m = re.match(r"^\((.+)\)$",parser._currentInstruction)
+            m = re.match(r"^\((.+)\)$",instructionParser._currentInstruction)
             label = m.group(1)
-            if symbol.contains(label) == False:
-                # Add the label to the table with the line count
-                symbol.add_entry(label,lineCount+1)
+            if symbolTable.contains(label) == False:
+                symbolTable.add_entry(label,lineCount)
         else:
             lineCount += 1
 
-    parser = instructionParser.InstructionParser(src)
+    instructionParser = InstructionParser(src)
+    # Symbol addressing starts with 16
     address = 16
     
     # Second pass
-    while parser.hasMoreLines():
+    while instructionParser.hasMoreCommands():
         line = ""
-        parser.advance()
-        # get the current instruction type
-        if parser.instructionType() == "L_INSTRUCTION":
+        instructionParser.advance()
+        if instructionParser.instructionType() == "L_INSTRUCTION":
+            # Skip labels, the first run already collected it
             continue
-        elif parser.instructionType() == "C_INSTRUCTION":
-            # Generate the c command
-            comp = parser.comp()
-            a = "1" if comp.find("M") != -1 else "0"
-            comp=generator.comp(comp)
-            dest = parser.dest()
-            if dest == None:
-                dest="000"
-            else:
-                dest=generator.dest(dest)
-            jump = parser.jump()
-            if jump == None:
-                jump = "000"
-            else:
-                jump = generator.jump(jump)
+        elif instructionParser.instructionType() == "C_INSTRUCTION":
+            parsedComp = instructionParser.comp()
+            # If the comp instruction has M a has to be 1 otherwise 0
+            a = "1" if parsedComp.find("M") != -1 else "0"
+            comp = codeGenerator.comp(parsedComp)
+
+            parsedDest = instructionParser.dest()
+            dest = "000"
+            if parsedDest != None:
+                dest = codeGenerator.dest(parsedDest)
+
+            parsedJump = instructionParser.jump()
+            jump = "000"
+            if parsedJump != None:
+                jump = codeGenerator.jump(parsedJump)
+
             line = "111" + a + comp + dest + jump
         else:
-            # Generate the a command
-            sym = parser.symbol()
-            if re.match(r"^\d+$",sym) == None:
-                # Get the symbol address from the table
-                # If it not exists, add to the table
-                if symbol.contains(sym) == False:
-                    symbol.add_entry(sym,address)
+            # Generate the A instruction
+            symbol = instructionParser.symbol()
+            if re.match(r"^\d+$",symbol) == None:
+                if symbolTable.contains(symbol) == False:
+                    symbolTable.add_entry(symbol,address)
                     address += 1
-                sym=symbol.get_address(sym)
-            line = bin(int(sym))[2:].zfill(16)
-        # Append the new line
+                symbol = symbolTable.get_address(symbol)
+            line = bin(int(symbol))[2:].zfill(16)
         out.write(line + "\n")
 
 if __name__ == '__main__':
